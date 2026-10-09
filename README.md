@@ -1,9 +1,5 @@
 # TokenPulse — LLM FinOps Observability Platform
 
-**MITK AI VISION 24H Hackathon**  
-**Problem Statement:** PS-04 — LLM FinOps Dashboard  
-**Platform Name:** TokenPulse  
-
 TokenPulse is a high-performance, lightweight OpenAI-compatible LLM proxy and telemetry monitoring service designed to solve enterprise AI cost opacity. It accurately records every AI request, tracks attribution by **Team**, **Feature**, and **User**, calculates token usage and costs using configurable pricing tables, provides a simulated AI provider (no paid API keys required), and visualizes all metrics in an interactive dark-mode dashboard.
 
 ---
@@ -216,4 +212,3 @@ The suite evaluates 16 deterministic benchmark cases covering all models, cached
 - **Pass Rate:** 100.00% (23 / 23 tests passed)
 - **Total Absolute Error:** $0.000000 USD
 - **Dashboard Reconciliation:** Verified Exact Match
-Full details are available in [`EVALUATION_REPORT.md`](EVALUATION_REPORT.md) and [`HACKATHON_REQUIREMENTS_AUDIT.md`](HACKATHON_REQUIREMENTS_AUDIT.md).
