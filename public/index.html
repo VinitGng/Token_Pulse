@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TokenPulse — LLM FinOps Observability Platform</title>
+  <meta name="description" content="TokenPulse: Enterprise LLM Cost, Usage & FinOps Observability Platform with multi-tenant attribution, budget management, and accuracy validation.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Supabase Official JS SDK (Local first, CDN fallback) -->
+  <script src="/js/supabase.js"></script>
+  <script>
+    if (!window.supabase) {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+      document.head.appendChild(s);
+    }
+  </script>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="brand-logo">
+          <div class="logo-icon"><i class="fa-solid fa-bolt-lightning"></i></div>
+          <div class="brand-text">
+            <h1>TokenPulse</h1>
+            <span class="version-badge">v1.0 • MITK FinOps (PS-04)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <nav class="nav-tabs">
+          <button class="nav-tab active" data-tab="overview">
+            <i class="fa-solid fa-chart-line"></i> Analytics
+          </button>
+          <button class="nav-tab" data-tab="requests">
+            <i class="fa-solid fa-list-check"></i> Request Explorer
+          </button>
+          <button class="nav-tab" data-tab="budgets">
+            <i class="fa-solid fa-wallet"></i> Budgets & Policies
+          </button>
+          <button class="nav-tab" data-tab="playground">
+            <i class="fa-solid fa-flask"></i> Proxy Playground
+          </button>
+          <button class="nav-tab" data-tab="pricing">
+            <i class="fa-solid fa-tags"></i> Pricing Registry
+          </button>
+          <button class="nav-tab" data-tab="evaluation">
+            <i class="fa-solid fa-clipboard-check"></i> Evaluation & Audit
+          </button>
+        </nav>
+      </div>
+
+      <div class="header-right">
+        <div class="status-indicator online">
+          <span class="pulse-dot"></span>
+          <span class="status-text">Gateway: Online</span>
+        </div>
+        <div id="user-profile-badge" class="user-badge" style="display:flex;align-items:center;gap:8px;padding:4px 10px;background:var(--bg-surface-elevated);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);font-size:0.8rem;">
+          <i class="fa-regular fa-user" style="color:var(--accent-cyan);"></i>
+          <span id="user-display-email" class="mono" style="color:var(--text-secondary);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Authenticated</span>
+          <button id="btn-logout" class="btn btn-outline btn-sm" style="padding:2px 8px;font-size:0.75rem;margin-left:4px;" title="Log out from TokenPulse">
+            <i class="fa-solid fa-arrow-right-from-bracket"></i>
+          </button>
+        </div>
+        <button id="btn-quick-test" class="btn btn-primary btn-sm">
+          <i class="fa-solid fa-paper-plane"></i> Send Request
+        </button>
+      </div>
+    </header>
+
+    <!-- Global Filter Bar -->
+    <section class="filter-strip" id="global-filter-strip">
+      <div class="filter-group">
+        <label for="filter-time"><i class="fa-regular fa-clock"></i> Time Window</label>
+        <select id="filter-time" class="form-select">
+          <option value="all">All Time</option>
+          <option value="24h">Last 24 Hours</option>
+          <option value="7d" selected>Last 7 Days</option>
+          <option value="30d">Last 30 Days</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="filter-team"><i class="fa-solid fa-users"></i> Team</label>
+        <select id="filter-team" class="form-select">
+          <option value="all">All Teams</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="filter-feature"><i class="fa-solid fa-puzzle-piece"></i> Feature</label>
+        <select id="filter-feature" class="form-select">
+          <option value="all">All Features</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="filter-provider"><i class="fa-solid fa-server"></i> Provider</label>
+        <select id="filter-provider" class="form-select">
+          <option value="all">All Providers</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="filter-model"><i class="fa-solid fa-microchip"></i> Model</label>
+        <select id="filter-model" class="form-select">
+          <option value="all">All Models</option>
+        </select>
+      </div>
+
+      <div class="filter-group filter-search">
+        <label for="filter-search"><i class="fa-solid fa-magnifying-glass"></i> Search</label>
+        <input type="text" id="filter-search" class="form-input" placeholder="User ID, prompt, ID...">
+      </div>
+
+      <div class="filter-actions">
+        <button id="btn-apply-filter" class="btn btn-secondary btn-sm" title="Refresh data">
+          <i class="fa-solid fa-arrows-rotate"></i> Refresh
+        </button>
+        <button id="btn-reset-filter" class="btn btn-outline btn-sm" title="Clear filters">
+          Reset
+        </button>
+      </div>
+    </section>
+
+    <!-- Main Content Container -->
+    <main class="main-content">
+
+      <!-- ======================================================== -->
+      <!-- TAB 1: OVERVIEW & ANALYTICS -->
+      <!-- ======================================================== -->
+      <div class="tab-pane active" id="tab-overview">
+        <!-- KPI Summary Cards -->
+        <div class="kpi-grid">
+          <div class="kpi-card" id="kpi-total-cost">
+            <div class="kpi-icon icon-emerald"><i class="fa-solid fa-dollar-sign"></i></div>
+            <div class="kpi-content">
+              <span class="kpi-label">Total Spend</span>
+              <div class="kpi-value" id="val-total-cost">$0.0000</div>
+              <span class="kpi-subtext" id="sub-cost-rate">All providers & models</span>
+            </div>
+          </div>
+
+          <div class="kpi-card" id="kpi-total-requests">
+            <div class="kpi-icon icon-indigo"><i class="fa-solid fa-chart-simple"></i></div>
+            <div class="kpi-content">
+              <span class="kpi-label">Total Requests</span>
+              <div class="kpi-value" id="val-total-requests">0</div>
+              <span class="kpi-subtext" id="sub-requests-info">0 Failed • 0% Error Rate</span>
+            </div>
+          </div>
+
+          <div class="kpi-card" id="kpi-total-tokens">
+            <div class="kpi-icon icon-cyan"><i class="fa-solid fa-coins"></i></div>
+            <div class="kpi-content">
+              <span class="kpi-label">Total Tokens</span>
+              <div class="kpi-value" id="val-total-tokens">0</div>
+              <span class="kpi-subtext" id="sub-token-split">0 In • 0 Out • 0 Cached</span>
+            </div>
+          </div>
+
+          <div class="kpi-card" id="kpi-avg-latency">
+            <div class="kpi-icon icon-amber"><i class="fa-regular fa-stopwatch"></i></div>
+            <div class="kpi-content">
+              <span class="kpi-label">Average Latency</span>
+              <div class="kpi-value" id="val-avg-latency">0 ms</div>
+              <span class="kpi-subtext">Gateway roundtrip</span>
+            </div>
+          </div>
+
+          <div class="kpi-card" id="kpi-cost-per-1k">
+            <div class="kpi-icon icon-purple"><i class="fa-solid fa-calculator"></i></div>
+            <div class="kpi-content">
+              <span class="kpi-label">Cost / 1k Tokens</span>
+              <div class="kpi-value" id="val-effective-rate">$0.0000</div>
+              <span class="kpi-subtext" id="sub-avg-cost-req">Avg $0.0000 / request</span>
+            </div>
+          </div>
+
+          <div class="kpi-card" id="kpi-entities">
+            <div class="kpi-icon icon-pink"><i class="fa-solid fa-sitemap"></i></div>
+            <div class="kpi-content">
+              <span class="kpi-label">Active Tenants</span>
+              <div class="kpi-value" id="val-active-tenants">0 Teams</div>
+              <span class="kpi-subtext" id="sub-tenants-info">0 Features • 0 Users</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Grid 1 -->
+        <div class="charts-grid-2">
+          <div class="card chart-card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-chart-area"></i> LLM Spend Timeline Over Time
+              </div>
+              <span class="card-badge">Spend Trend ($)</span>
+            </div>
+            <div class="card-body chart-wrapper">
+              <canvas id="chart-timeline"></canvas>
+            </div>
+          </div>
+
+          <div class="card chart-card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-chart-pie"></i> Spend Attribution by Team
+              </div>
+              <span class="card-badge">Share of Wallet</span>
+            </div>
+            <div class="card-body chart-wrapper">
+              <canvas id="chart-team-donut"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Grid 2 -->
+        <div class="charts-grid-2">
+          <div class="card chart-card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-chart-column"></i> Token Consumption by Model
+              </div>
+              <span class="card-badge">Input vs Output</span>
+            </div>
+            <div class="card-body chart-wrapper">
+              <canvas id="chart-model-tokens"></canvas>
+            </div>
+          </div>
+
+          <div class="card chart-card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-ranking-star"></i> Top Features by LLM Cost
+              </div>
+              <span class="card-badge">Highest Spenders</span>
+            </div>
+            <div class="card-body chart-wrapper">
+              <canvas id="chart-feature-costs"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Detailed Breakdown Tables Section -->
+        <div class="card table-card">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fa-solid fa-table-cells"></i> Multi-Dimensional Breakdown
+            </div>
+            <div class="breakdown-switcher">
+              <button class="tab-pill active" data-subtab="by-team">By Team</button>
+              <button class="tab-pill" data-subtab="by-feature">By Feature</button>
+              <button class="tab-pill" data-subtab="by-model">By Model</button>
+              <button class="tab-pill" data-subtab="by-provider">By Provider</button>
+              <button class="tab-pill" data-subtab="by-user">Top Spender Users</button>
+            </div>
+          </div>
+          <div class="card-body no-padding">
+            <div class="table-responsive">
+              <table class="data-table" id="breakdown-table">
+                <thead id="breakdown-thead"></thead>
+                <tbody id="breakdown-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- TAB 2: REQUEST EXPLORER (AUDIT LOGS) -->
+      <!-- ======================================================== -->
+      <div class="tab-pane" id="tab-requests">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fa-solid fa-list-check"></i> Recorded LLM Request Audit Log
+            </div>
+            <div class="card-actions">
+              <button id="btn-export-csv" class="btn btn-secondary btn-sm">
+                <i class="fa-solid fa-file-csv"></i> Export CSV
+              </button>
+              <button id="btn-clear-logs" class="btn btn-danger-outline btn-sm">
+                <i class="fa-regular fa-trash-can"></i> Clear All Logs
+              </button>
+            </div>
+          </div>
+          <div class="card-body no-padding">
+            <div class="table-responsive">
+              <table class="data-table" id="requests-table">
+                <thead>
+                  <tr>
+                    <th>Timestamp</th>
+                    <th>Request ID</th>
+                    <th>Team</th>
+                    <th>Feature</th>
+                    <th>User</th>
+                    <th>Provider</th>
+                    <th>Model</th>
+                    <th>Tokens (In / Cached / Out / Total)</th>
+                    <th>Calculated Cost</th>
+                    <th>Latency</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="requests-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card-footer pagination-footer">
+            <div class="pagination-info" id="pagination-info">Showing 0 of 0 requests</div>
+            <div class="pagination-controls">
+              <button id="btn-prev-page" class="btn btn-outline btn-sm" disabled><i class="fa-solid fa-chevron-left"></i> Prev</button>
+              <span id="page-indicator" class="page-indicator">Page 1</span>
+              <button id="btn-next-page" class="btn btn-outline btn-sm" disabled>Next <i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- TAB 3: BUDGET MANAGEMENT -->
+      <!-- ======================================================== -->
+      <div class="tab-pane" id="tab-budgets">
+        <div class="card" style="margin-bottom: 24px;">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fa-solid fa-wallet"></i> Team & Feature FinOps Budget Policies
+            </div>
+            <div class="card-actions">
+              <button id="btn-add-budget" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-plus"></i> Configure Budget Policy
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 16px;">
+              Enforce spending ceilings and receive threshold warnings across business departments and AI product features. Budgets configured with <code>Enforce</code> mode actively block upstream execution once limits are reached.
+            </p>
+            <div class="budgets-grid" id="budgets-container">
+              <!-- Dynamically populated budget cards -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- TAB 4: PROXY PLAYGROUND & SIMULATOR -->
+      <!-- ======================================================== -->
+      <div class="tab-pane" id="tab-playground">
+        <div class="playground-layout">
+          <!-- Left: Request Configuration Form -->
+          <div class="card playground-form-card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-flask"></i> Interactive LLM Proxy Client
+              </div>
+              <span class="card-badge">OpenAI v1 Compatible</span>
+            </div>
+            <div class="card-body">
+              <div class="presets-row">
+                <label class="section-label">Quick Presets:</label>
+                <div class="preset-chips">
+                  <button class="chip" data-preset="support">Customer Support Ticket</button>
+                  <button class="chip" data-preset="code">Code Review & Refactor</button>
+                  <button class="chip" data-preset="sql">SQL Query Generator</button>
+                  <button class="chip" data-preset="marketing">Marketing Copywriter</button>
+                  <button class="chip" data-preset="sentiment">User Sentiment Analysis</button>
+                </div>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label for="play-model">Model</label>
+                  <select id="play-model" class="form-select"></select>
+                </div>
+
+                <div class="form-group">
+                  <label for="play-team">Attributed Team (x-team)</label>
+                  <input type="text" id="play-team" class="form-input" value="Core Engineering">
+                </div>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label for="play-feature">Attributed Feature (x-feature)</label>
+                  <input type="text" id="play-feature" class="form-input" value="Code Review Assistant">
+                </div>
+
+                <div class="form-group">
+                  <label for="play-user">User Identifier (x-user)</label>
+                  <input type="text" id="play-user" class="form-input" value="alex.dev">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="play-prompt">Prompt / Messages Payload</label>
+                <textarea id="play-prompt" class="form-textarea" rows="4" placeholder="Enter prompt or test query...">Can you review this JavaScript function for memory leaks and provide an optimized version?</textarea>
+              </div>
+
+              <div class="options-row">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="play-stream" checked>
+                  <span>Simulate Real-Time Streaming (SSE)</span>
+                </label>
+
+                <div class="slider-group">
+                  <label for="play-delay">Latency Delay: <span id="delay-val">150</span>ms</label>
+                  <input type="range" id="play-delay" min="30" max="800" step="10" value="150">
+                </div>
+              </div>
+
+              <div class="form-actions-split">
+                <button id="btn-send-proxy" class="btn btn-primary btn-block">
+                  <i class="fa-solid fa-paper-plane"></i> Send Request Through Proxy
+                </button>
+              </div>
+
+              <!-- Batch Traffic Simulator Section -->
+              <div class="batch-simulator-box">
+                <div class="batch-title">
+                  <i class="fa-solid fa-network-wired"></i> Batch Traffic Generator
+                </div>
+                <p class="batch-desc">Simulate realistic enterprise multi-tenant traffic across teams, features, and models to populate dashboard analytics instantly.</p>
+                <div class="batch-controls">
+                  <button class="btn btn-secondary btn-sm" id="btn-batch-25"><i class="fa-solid fa-bolt"></i> +25 Requests</button>
+                  <button class="btn btn-secondary btn-sm" id="btn-batch-50"><i class="fa-solid fa-bolt"></i> +50 Requests</button>
+                  <button class="btn btn-secondary btn-sm" id="btn-batch-100"><i class="fa-solid fa-bolt"></i> +100 Requests</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Live Proxy Response & Telemetry Inspection -->
+          <div class="card playground-result-card">
+            <div class="card-header">
+              <div class="card-title">
+                <i class="fa-solid fa-terminal"></i> Live Proxy Telemetry & Response
+              </div>
+              <span id="response-status-badge" class="badge badge-neutral">Idle</span>
+            </div>
+            <div class="card-body response-body">
+              <!-- Live Telemetry KPI Bar -->
+              <div class="live-telemetry-bar" id="live-telemetry-bar">
+                <div class="tel-item">
+                  <span class="tel-label">Estimated Cost</span>
+                  <span class="tel-value" id="tel-cost">$0.000000</span>
+                </div>
+                <div class="tel-item">
+                  <span class="tel-label">Prompt Tokens</span>
+                  <span class="tel-value" id="tel-prompt-tokens">0</span>
+                </div>
+                <div class="tel-item">
+                  <span class="tel-label">Cached Tokens</span>
+                  <span class="tel-value" id="tel-cached-tokens">0</span>
+                </div>
+                <div class="tel-item">
+                  <span class="tel-label">Comp. Tokens</span>
+                  <span class="tel-value" id="tel-comp-tokens">0</span>
+                </div>
+                <div class="tel-item">
+                  <span class="tel-label">Total Tokens</span>
+                  <span class="tel-value" id="tel-total-tokens">0</span>
+                </div>
+                <div class="tel-item">
+                  <span class="tel-label">Roundtrip</span>
+                  <span class="tel-value" id="tel-latency">0 ms</span>
+                </div>
+              </div>
+
+              <!-- Live Text Output Stream -->
+              <div class="response-stream-container">
+                <div class="response-stream-label">Assistant Response Stream:</div>
+                <pre class="response-stream-output" id="response-output">Awaiting request dispatch... Click "Send Request Through Proxy" to test.</pre>
+              </div>
+
+              <!-- Calculation Math Breakdown -->
+              <div class="math-breakdown-card" id="math-breakdown-card">
+                <div class="math-title"><i class="fa-solid fa-calculator"></i> Transparent Cost Formula Breakdown:</div>
+                <div class="math-content" id="math-formula-content">
+                  <code>Cost = (Prompt Tokens / 1M × Input Rate) + (Cached Tokens / 1M × Cached Rate) + (Completion Tokens / 1M × Output Rate)</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- TAB 5: PRICING REGISTRY -->
+      <!-- ======================================================== -->
+      <div class="tab-pane" id="tab-pricing">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fa-solid fa-tags"></i> LLM Model Pricing Registry
+            </div>
+            <div class="card-actions">
+              <button id="btn-add-model" class="btn btn-primary btn-sm">
+                <i class="fa-solid fa-plus"></i> Add Custom Model
+              </button>
+            </div>
+          </div>
+          <div class="card-body no-padding">
+            <div class="table-responsive">
+              <table class="data-table" id="pricing-table">
+                <thead>
+                  <tr>
+                    <th>Model Identifier</th>
+                    <th>Display Name</th>
+                    <th>Provider</th>
+                    <th>Input Cost / 1M</th>
+                    <th>Cached Cost / 1M</th>
+                    <th>Output Cost / 1M</th>
+                    <th>Version & Source</th>
+                    <th>Verified</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="pricing-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card-footer">
+            <span class="subtext-note"><i class="fa-solid fa-circle-info"></i> Changes to model rates immediately apply to all new incoming proxy requests and evaluation audits.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================== -->
+      <!-- TAB 6: EVALUATION & ACCURACY AUDIT -->
+      <!-- ======================================================== -->
+      <div class="tab-pane" id="tab-evaluation">
+        <!-- Verification Banner Card -->
+        <div class="card evaluation-banner-card">
+          <div class="banner-content">
+            <div class="banner-badge" id="eval-verdict-badge">
+              <i class="fa-solid fa-circle-check"></i> 100% ACCURATE
+            </div>
+            <div class="banner-details">
+              <h2>Evaluation & Telemetry Accuracy Audit</h2>
+              <p id="eval-verdict-desc">Compares dashboard totals and calculator cost estimations against mathematically known ground-truth benchmark values.</p>
+              <div class="eval-meta">
+                <span id="eval-timestamp"><i class="fa-regular fa-clock"></i> Last evaluated: Just now</span>
+                <span id="eval-score-text"><i class="fa-solid fa-shield-check"></i> Score: 23 / 23 Tests Passed</span>
+              </div>
+            </div>
+          </div>
+          <div class="banner-actions">
+            <button id="btn-run-eval" class="btn btn-primary">
+              <i class="fa-solid fa-play"></i> Run Verification Suite
+            </button>
+            <button id="btn-download-eval-csv" class="btn btn-secondary">
+              <i class="fa-solid fa-file-csv"></i> Export CSV
+            </button>
+            <button id="btn-download-eval-json" class="btn btn-secondary">
+              <i class="fa-solid fa-file-code"></i> Export JSON
+            </button>
+          </div>
+        </div>
+
+        <!-- Section 1: Aggregate Dashboard Verification -->
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fa-solid fa-layer-group"></i> Aggregate Dashboard Totals vs Known Ground Truth
+            </div>
+            <span class="card-badge">System Batch Audit</span>
+          </div>
+          <div class="card-body no-padding">
+            <div class="table-responsive">
+              <table class="data-table" id="eval-aggregate-table">
+                <thead>
+                  <tr>
+                    <th>Telemetry Metric</th>
+                    <th>Expected Ground Truth</th>
+                    <th>Actual Dashboard Value</th>
+                    <th>Discrepancy (Delta)</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="eval-aggregate-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Unit Calculator Benchmark Test Matrix -->
+        <div class="card" style="margin-bottom: 20px;">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fa-solid fa-vial-circle-check"></i> Unit Calculator Benchmark Test Matrix (16 Cases)
+            </div>
+            <span class="card-badge">Deterministic Formula Tests</span>
+          </div>
+          <div class="card-body no-padding">
+            <div class="table-responsive">
+              <table class="data-table" id="eval-matrix-table">
+                <thead>
+                  <tr>
+                    <th>Test ID</th>
+                    <th>Model</th>
+                    <th>Provider</th>
+                    <th>Team</th>
+                    <th>Description</th>
+                    <th>Prompt</th>
+                    <th>Cached</th>
+                    <th>Comp</th>
+                    <th>Total Tokens</th>
+                    <th>Expected ($)</th>
+                    <th>Actual ($)</th>
+                    <th>Abs Error ($)</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="eval-matrix-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Multi-Team Attribution Audit -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              <i class="fa-solid fa-users-gear"></i> Multi-Team Attribution Aggregation Audit
+            </div>
+            <span class="card-badge">Tenant Isolation Verification</span>
+          </div>
+          <div class="card-body no-padding">
+            <div class="table-responsive">
+              <table class="data-table" id="eval-team-table">
+                <thead>
+                  <tr>
+                    <th>Business Unit / Team</th>
+                    <th>Expected Total Spend ($)</th>
+                    <th>Actual Aggregated Spend ($)</th>
+                    <th>Absolute Error ($)</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="eval-team-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Modal: Request Detail & Replay Drawer -->
+    <div class="modal-backdrop" id="modal-request-detail">
+      <div class="modal-container">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fa-solid fa-circle-info"></i> Request Telemetry & Replay
+          </div>
+          <button class="modal-close" id="modal-close-btn">&times;</button>
+        </div>
+        <div class="modal-body" id="modal-request-body"></div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="modal-replay-btn">
+            <i class="fa-solid fa-rotate-right"></i> Replay Request Through Proxy
+          </button>
+          <button type="button" class="btn btn-outline" id="modal-req-close-footer">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Budget Configuration -->
+    <div class="modal-backdrop" id="modal-budget">
+      <div class="modal-container modal-sm">
+        <div class="modal-header">
+          <div class="modal-title" id="modal-budget-title">
+            <i class="fa-solid fa-wallet"></i> Configure Budget Policy
+          </div>
+          <button class="modal-close" id="modal-budget-close">&times;</button>
+        </div>
+        <form id="form-budget" class="modal-body">
+          <input type="hidden" id="budget-id">
+          <div class="form-group">
+            <label for="budget-entity-type">Entity Type</label>
+            <select id="budget-entity-type" class="form-select">
+              <option value="team">Team Budget</option>
+              <option value="feature">Feature Budget</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="budget-entity-id">Entity Name</label>
+            <input type="text" id="budget-entity-id" class="form-input" required placeholder="e.g. Core Engineering">
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="budget-limit">Limit (USD $)</label>
+              <input type="number" step="0.01" id="budget-limit" class="form-input" required placeholder="50.00">
+            </div>
+            <div class="form-group">
+              <label for="budget-threshold">Alert Threshold</label>
+              <select id="budget-threshold" class="form-select">
+                <option value="0.70">70%</option>
+                <option value="0.80" selected>80%</option>
+                <option value="0.90">90%</option>
+                <option value="1.00">100%</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="budget-mode">Enforcement Policy</label>
+            <select id="budget-mode" class="form-select">
+              <option value="monitor" selected>Monitor Only (Alert without blocking)</option>
+              <option value="enforce">Enforce (Block requests with HTTP 429 when exceeded)</option>
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline" id="modal-budget-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Policy</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Edit / Add Pricing Model -->
+    <div class="modal-backdrop" id="modal-pricing">
+      <div class="modal-container modal-sm">
+        <div class="modal-header">
+          <div class="modal-title" id="modal-pricing-title">
+            <i class="fa-solid fa-tags"></i> Edit Model Pricing
+          </div>
+          <button class="modal-close" id="modal-pricing-close">&times;</button>
+        </div>
+        <form id="form-pricing" class="modal-body">
+          <div class="form-group">
+            <label for="price-model-id">Model Identifier</label>
+            <input type="text" id="price-model-id" class="form-input" required placeholder="e.g. gpt-4o">
+          </div>
+          <div class="form-group">
+            <label for="price-display-name">Display Name</label>
+            <input type="text" id="price-display-name" class="form-input" placeholder="e.g. OpenAI GPT-4o">
+          </div>
+          <div class="form-group">
+            <label for="price-provider">Provider</label>
+            <input type="text" id="price-provider" class="form-input" placeholder="e.g. OpenAI, Google, Anthropic">
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="price-input-rate">Input Cost / 1M ($)</label>
+              <input type="number" step="0.0001" id="price-input-rate" class="form-input" required placeholder="2.50">
+            </div>
+            <div class="form-group">
+              <label for="price-output-rate">Output Cost / 1M ($)</label>
+              <input type="number" step="0.0001" id="price-output-rate" class="form-input" required placeholder="10.00">
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="price-cached-rate">Cached Input Cost / 1M ($)</label>
+            <input type="number" step="0.0001" id="price-cached-rate" class="form-input" placeholder="1.25">
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline" id="modal-pricing-cancel">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save Pricing</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

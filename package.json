@@ -1,0 +1,30 @@
+{
+  "name": "tokenpulse",
+  "version": "1.0.0",
+  "description": "TokenPulse — LLM Cost, Token Usage & FinOps Observability Platform",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test --test-concurrency=1 tests/*.test.js",
+    "evaluate": "node scripts/evaluate.js",
+    "seed": "node scripts/seed.js"
+  },
+  "keywords": [
+    "llm",
+    "finops",
+    "token-monitoring",
+    "cost-observability",
+    "ai-gateway",
+    "portkey",
+    "litellm"
+  ],
+  "author": "TokenPulse Team",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}
